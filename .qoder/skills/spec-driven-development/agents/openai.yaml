@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spec Driven Development"
+  short_description: "Spec-first workflow for AI coding."
+  default_prompt: "Use $spec-driven-development to clarify this development request into a concrete spec before implementation."

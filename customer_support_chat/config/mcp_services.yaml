@@ -1,0 +1,18 @@
+mcp_services:
+  openweathermap:
+    enabled: true
+    type: "openweathermap"
+    base_url: "https://api.openweathermap.org/data/2.5"
+    api_key: "${OPENWEATHERMAP_API_KEY}"
+    timeout: 10
+
+  amadeus:
+    enabled: true
+    type: "amadeus_mock"
+    base_url: "http://localhost:8001"
+    mode: "mock"
+    timeout: 15
+
+hot_reload:
+  enabled: true
+  watch_interval: 30

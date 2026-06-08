@@ -1,0 +1,39 @@
+# 环境变量与密钥
+.env
+.env.*
+!.env.example
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyo
+.cache/
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 用户数据
+user_data/
+web_app/user_data/
+
+# 日志
+*.log
+
+# ONNX 模型（大文件）
+onnx/
+
+# IDE
+.vscode/
+.idea/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 构建产物
+dist/
+build/
+*.egg-info/

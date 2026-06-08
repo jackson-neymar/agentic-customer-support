@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Dashboard - Customer Support AI</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .card h3::before {
+            content: '';
+            width: 8px;
+            height: 24px;
+            background: #667eea;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .metric-item {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 280px;
+            margin-top: 15px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-healthy {
+            background: #4CAF50;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .big-card {
+            grid-column: span 2;
+        }
+
+        .alert {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #856404;
+        }
+
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 0.9em;
+            color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            .big-card {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="refresh-indicator">
+        <span class="status-indicator status-healthy"></span>
+        Auto-refresh: <span id="countdown">5</span>s
+    </div>
+
+    <div class="header">
+        <h1>🚀 Customer Support AI Performance Dashboard</h1>
+        <p>Real-time monitoring and analytics</p>
+    </div>
+
+    <div class="dashboard">
+        <!-- 系统概览 -->
+        <div class="card">
+            <h3>📊 System Overview</h3>
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-label">Total Requests</div>
+                    <div class="metric-value" id="total-requests">0</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Active Sessions</div>
+                    <div class="metric-value" id="active-sessions">0</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Avg Response Time</div>
+                    <div class="metric-value" id="avg-response-time">0s</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Error Count</div>
+                    <div class="metric-value" id="error-count" style="color: #f44336;">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统健康 -->
+        <div class="card">
+            <h3>💚 System Health</h3>
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-usage">0%</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-usage">0%</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Uptime</div>
+                    <div class="metric-value" style="font-size: 1.2em;" id="uptime">0h 0m</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Status</div>
+                    <div class="metric-value" style="color: #4CAF50; font-size: 1.2em;">● HEALTHY</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HITL 审批统计 -->
+        <div class="card">
+            <h3>✋ Human-in-the-Loop</h3>
+            <div class="chart-container">
+                <canvas id="approvalChart"></canvas>
+            </div>
+            <div class="metric-grid" style="margin-top: 15px;">
+                <div class="metric-item">
+                    <div class="metric-label">Approved</div>
+                    <div class="metric-value" style="color: #4CAF50;" id="total-approvals">0</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Rejected</div>
+                    <div class="metric-value" style="color: #f44336;" id="total-rejections">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 响应时间趋势 -->
+        <div class="card">
+            <h3>⏱️ Response Time Trend</h3>
+            <div class="chart-container">
+                <canvas id="responseTimeChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 请求量趋势 -->
+        <div class="card big-card">
+            <h3>📈 Request Volume Over Time</h3>
+            <div class="chart-container" style="height: 250px;">
+                <canvas id="requestVolumeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局数据存储
+        const chartData = {
+            responseTimes: [],
+            requestVolumes: [],
+            timestamps: [],
+            maxDataPoints: 20
+        };
+
+        // 初始化图表
+        const approvalChart = new Chart(document.getElementById('approvalChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Approved', 'Rejected'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['#4CAF50', '#f44336'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        const responseTimeChart = new Chart(document.getElementById('responseTimeChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Avg Response Time (s)',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Seconds'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        const requestVolumeChart = new Chart(document.getElementById('requestVolumeChart'), {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Requests',
+                    data: [],
+                    backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                    borderColor: '#667eea',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+
+        // 更新Dashboard数据
+        async function updateDashboard() {
+            try {
+                const response = await fetch('/stats');
+                const data = await response.json();
+
+                // 更新概览指标
+                document.getElementById('total-requests').textContent = data.total_requests || 0;
+                document.getElementById('active-sessions').textContent = data.active_sessions || 0;
+                document.getElementById('avg-response-time').textContent = 
+                    (data.avg_response_time || 0).toFixed(2) + 's';
+                document.getElementById('error-count').textContent = data.error_count || 0;
+
+                // 更新系统健康
+                document.getElementById('cpu-usage').textContent = 
+                    (data.system?.cpu_percent || 0).toFixed(1) + '%';
+                document.getElementById('memory-usage').textContent = 
+                    (data.system?.memory_percent || 0).toFixed(1) + '%';
+                document.getElementById('uptime').textContent = data.uptime_formatted || '0h 0m';
+
+                // 更新HITL统计
+                document.getElementById('total-approvals').textContent = data.total_approvals || 0;
+                document.getElementById('total-rejections').textContent = data.total_rejections || 0;
+
+                // 更新审批饼图
+                approvalChart.data.datasets[0].data = [
+                    data.total_approvals || 0,
+                    data.total_rejections || 0
+                ];
+                approvalChart.update();
+
+                // 更新趋势图
+                const now = new Date().toLocaleTimeString();
+                chartData.timestamps.push(now);
+                chartData.responseTimes.push(data.avg_response_time || 0);
+                chartData.requestVolumes.push(data.total_requests || 0);
+
+                // 保持最多20个数据点
+                if (chartData.timestamps.length > chartData.maxDataPoints) {
+                    chartData.timestamps.shift();
+                    chartData.responseTimes.shift();
+                    chartData.requestVolumes.shift();
+                }
+
+                // 更新响应时间图表
+                responseTimeChart.data.labels = chartData.timestamps;
+                responseTimeChart.data.datasets[0].data = chartData.responseTimes;
+                responseTimeChart.update();
+
+                // 更新请求量图表
+                requestVolumeChart.data.labels = chartData.timestamps;
+                requestVolumeChart.data.datasets[0].data = chartData.requestVolumes;
+                requestVolumeChart.update();
+
+            } catch (error) {
+                console.error('Failed to fetch stats:', error);
+            }
+        }
+
+        // 倒计时自动刷新
+        let countdown = 5;
+        setInterval(() => {
+            countdown--;
+            document.getElementById('countdown').textContent = countdown;
+            
+            if (countdown <= 0) {
+                updateDashboard();
+                countdown = 5;
+            }
+        }, 1000);
+
+        // 初始加载
+        updateDashboard();
+    </script>
+</body>
+</html>

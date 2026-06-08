@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'customer-support-monitor'
+
+scrape_configs:
+  - job_name: 'customer-support-chat'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['customer-support-chat:8000']
+        labels:
+          app: 'customer-support-chat'
+          environment: 'production'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          app: 'prometheus'
+          environment: 'production'
