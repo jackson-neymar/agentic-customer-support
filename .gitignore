@@ -21,6 +21,9 @@ web_app/user_data/
 # 日志
 *.log
 
+knowledge_base/
+faq_documents/
+debug_log/
 # ONNX 模型（大文件）
 onnx/
 
@@ -32,6 +35,12 @@ onnx/
 .venv/
 venv/
 env/
+
+# 忽略所有 md 文件
+*.md
+
+# 但保留 README.md
+!README.md
 
 # 构建产物
 dist/
