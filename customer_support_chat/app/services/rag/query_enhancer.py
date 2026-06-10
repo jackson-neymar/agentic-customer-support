@@ -31,26 +31,28 @@ class QueryEnhancer:
         }
     
     async def _generate_hyde(self, query: str) -> str:
-        """HyDE: 生成假设性答案文档"""
-        
-        prompt = f"""Given the question: "{query}"
-        
-Write a detailed, hypothetical answer that would perfectly answer this question.
-This will be used to find similar real documents.
+        """HyDE: 生成中性的检索增强文档，不作为事实依据"""
 
-Hypothetical Answer:"""
-        
+        prompt = f"""给定用户问题："{query}"
+
+请生成一段用于检索增强的中性假设文档。
+描述与回答该问题相关的概念、政策维度、实体和术语。
+不要编造具体价格、日期、承诺、库存/可用性、政策结论或事实性结论。
+使用中性表述。这段文本只用于匹配相似的真实文档，不作为最终回答依据。
+
+假设检索文档："""
+
         response = await self.llm.ainvoke(prompt)
         return response.content
     
     async def _decompose_query(self, query: str) -> List[str]:
         """将复杂查询分解为子查询"""
         
-        prompt = f"""Break down this complex question into simpler sub-questions:
+        prompt = f"""请将下面这个复杂问题拆解成更简单的子问题：
 "{query}"
 
-If it's already simple, return an empty list.
-Return as JSON list: ["sub_question1", "sub_question2", ...]"""
+如果问题本身已经很简单，请返回空列表。
+只返回 JSON 数组，不要添加解释文字，例如：["子问题1", "子问题2"]"""
         
         response = await self.llm.ainvoke(prompt)
         # 解析JSON
@@ -63,10 +65,10 @@ Return as JSON list: ["sub_question1", "sub_question2", ...]"""
     async def _expand_query(self, query: str) -> List[str]:
         """扩展查询（同义词、相关概念）"""
         
-        prompt = f"""Generate 2-3 alternative phrasings of this query:
+        prompt = f"""请为下面的查询生成 2-3 个中文替代表述或相关检索说法：
 "{query}"
 
-Return as JSON list: ["alternative1", "alternative2", ...]"""
+只返回 JSON 数组，不要添加解释文字，例如：["替代表述1", "替代表述2"]"""
         
         response = await self.llm.ainvoke(prompt)
         import json

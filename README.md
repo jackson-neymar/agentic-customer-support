@@ -138,6 +138,7 @@ graph LR
 
 - 实现位置：[`guardrail_agents.py`](file:///c:/Users/jiesheng.xiao_sx/Desktop/langgraph_multi-agent-rag-customer-support/customer_support_chat/app/services/guardrails/guardrail_agents.py)、[`humanloop_manager.py`](file:///c:/Users/jiesheng.xiao_sx/Desktop/langgraph_multi-agent-rag-customer-support/customer_support_chat/app/core/humanloop_manager.py)
 - LangGraph `interrupt_before` 在敏感节点暂停 → 等待人工 / 用户确认 → 通过后继续。
+- 敏感工具函数通过 GoHumanLoop `HumanloopAdapter.require_approval(execute_on_reject=False)` 二次审批；默认走 Terminal Provider，本地/开发环境可直接确认，配置 `GOHUMANLOOP_PROVIDER=api`、`GOHUMANLOOP_API_BASE_URL`、`GOHUMANLOOP_API_KEY` 后可切换到飞书等外部审批渠道。
 
 ### 4️⃣ FAQ 知识库自动更新（[`faq_extension/`](file:///c:/Users/jiesheng.xiao_sx/Desktop/langgraph_multi-agent-rag-customer-support/faq_extension)）
 
@@ -375,7 +376,7 @@ poetry run python customer_support_chat/tests/test_hotel_booking.py
 
 ---
 
-## 🎯 工程亮点（面向面试官）
+## 🎯 工程亮点
 
 1. **架构设计能力**：用 LangGraph 的 **状态机 + 条件路由 + 中断机制**，实现 Supervisor 模式多 Agent 协作，避免 Agent 互相干扰，支持子任务"上交"主助手（`CompleteOrEscalate`）；`dialog_state` 栈在入口 push、`leave_skill` 节点 pop，对称且原子一致。
 2. **检索系统优化**：自研 Hybrid Retriever（BM25 + Vector + RRF + Cross-Encoder Rerank），并支持中文 jieba 分词与 ONNX 本地量化 Embedding，兼顾**精度、性能与成本**。

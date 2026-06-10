@@ -351,7 +351,80 @@ class HybridRetriever:
             unique_results.sort(key=lambda r: r.score, reverse=True)
         
         return unique_results[:top_k]
-    
+
+    async def retrieve_multi_query(
+        self,
+        original_query: str,
+        supplementary_queries: Optional[List[str]] = None,
+        sources: Optional[List[KnowledgeSource]] = None,
+        method: str = "hybrid_rerank",
+        top_k: int = 5,
+        bm25_weight: float = 0.5,
+        vector_weight: float = 0.5,
+        rerank: bool = False
+    ) -> List[RetrievalResult]:
+        """
+        多查询补充召回：始终保留原始 query，HyDE / query expansion 只作为补充召回信号。
+
+        关键约束：
+        - 召回阶段可以使用 supplementary_queries 扩大候选集
+        - 最终 Cross-Encoder 重排序必须使用 original_query，避免被 HyDE 假设内容带偏
+        """
+        supplementary_queries = supplementary_queries or []
+
+        # 去重并保序：原始 query 永远排第一
+        queries: List[str] = []
+        seen = set()
+        for q in [original_query, *supplementary_queries]:
+            if not q or not str(q).strip():
+                continue
+            normalized = str(q).strip()
+            key = normalized.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            queries.append(normalized)
+
+        if not queries:
+            return []
+
+        # hybrid_rerank 在单 query retrieve() 内会强制用传入 query rerank。
+        # 多 query 场景下先用 hybrid 召回，最后统一用 original_query rerank。
+        recall_method = "hybrid" if method == "hybrid_rerank" else method
+        should_rerank = rerank or method == "hybrid_rerank"
+        recall_k = max(top_k * 2, top_k)
+
+        all_results: List[RetrievalResult] = []
+        for query in queries:
+            try:
+                query_results = await self.retrieve(
+                    query=query,
+                    sources=sources,
+                    method=recall_method,
+                    top_k=recall_k,
+                    bm25_weight=bm25_weight,
+                    vector_weight=vector_weight,
+                    rerank=False,
+                )
+                all_results.extend(query_results)
+            except Exception as e:
+                print(f"⚠️ Multi-query retrieval error for query '{query[:50]}': {e}")
+
+        # 同一内容可能被原始 query / HyDE / expansion 多次召回；保留最高分，避免分数累加超过 1
+        content_to_best: Dict[str, RetrievalResult] = {}
+        for result in all_results:
+            existing = content_to_best.get(result.content)
+            if existing is None or result.score > existing.score:
+                content_to_best[result.content] = result
+
+        unique_results = list(content_to_best.values())
+
+        if should_rerank and len(unique_results) > top_k and self.reranker is not None:
+            return self._rerank(original_query, unique_results, top_k)
+
+        unique_results.sort(key=lambda r: r.score, reverse=True)
+        return unique_results[:top_k]
+
     # =====================================
     # 🆕 BM25 单独检索
     # =====================================

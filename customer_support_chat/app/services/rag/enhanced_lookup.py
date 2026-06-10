@@ -54,14 +54,14 @@ async def lookup_policy_enhanced(
     # 2. 生成答案
     context = "\n\n".join([r.content for r in results])
     
-    prompt = f"""Based on the following policy documents, answer the question.
+    prompt = f"""请基于以下政策文档回答用户问题。
 
-Question: {query}
+用户问题：{query}
 
-Relevant Documents:
+相关文档：
 {context}
 
-Answer (be concise and accurate):"""
+请给出简洁、准确的回答："""
     
     answer = await llm.ainvoke(prompt)
     
@@ -94,9 +94,9 @@ async def search_travel_guides(
     if not HAS_DEPENDENCIES:
         return "Error: RAG dependencies not properly initialized"
     
-    query = f"Travel guide for {destination}"
+    query = f"{destination} 旅游攻略"
     if interests:
-        query += f" focusing on {', '.join(interests)}"
+        query += f"，重点关注：{', '.join(interests)}"
     
     results = await hybrid_retriever.retrieve(
         query=query,
@@ -110,16 +110,16 @@ async def search_travel_guides(
     # 生成个性化推荐
     context = "\n\n".join([r.content for r in results])
     
-    interests_str = ", ".join(interests) if interests else "general sightseeing"
+    interests_str = "、".join(interests) if interests else "常规观光"
     
-    prompt = f"""Create a personalized travel recommendation for {destination}.
+    prompt = f"""请为 {destination} 生成个性化旅游推荐。
 
-Available Information:
+可用信息：
 {context}
 
-Interests: {interests_str}
+用户兴趣：{interests_str}
 
-Recommendation (be specific and helpful):"""
+请给出具体、有帮助的推荐："""
     
     recommendation = await llm.ainvoke(prompt)
     

@@ -92,29 +92,31 @@ class SelfReflectionLoop:
                 logger.warning("Reflection loop timeout, returning current answer")
                 break
 
-            # Query Rewriting
-            rewritten_query = await self._rewrite_query(query, conversation_history)
-            logger.info(f"Reflection retry {retry+1}: rewritten query = {rewritten_query[:100]}")
+            # Query Rewriting 只生成补充召回信号，不替代原始问题
+            supplementary_queries = await self._build_supplementary_queries(query, conversation_history)
+            logger.info(
+                f"Reflection retry {retry+1}: supplementary queries = {len(supplementary_queries)}"
+            )
 
-            # 重新检索
+            # 重新检索：原始 query 始终参与召回，HyDE / expansion 只补充候选
             if self.retriever:
-                current_docs = await self._retrieve(rewritten_query)
+                current_docs = await self._retrieve(query, supplementary_queries)
 
-            # 重新生成
+            # 重新生成：仍然回答用户原始问题，避免让 HyDE 假设内容成为事实锚点
             if self.generate_answer_fn:
                 try:
-                    current_answer = await self.generate_answer_fn(rewritten_query, current_docs)
+                    current_answer = await self.generate_answer_fn(query, current_docs)
                 except Exception as e:
                     logger.error(f"Answer regeneration failed: {e}")
 
-            # 重新评估
-            h_score, r_score = await self._evaluate(rewritten_query, current_docs, current_answer)
+            # 重新评估：仍以用户原始问题为准
+            h_score, r_score = await self._evaluate(query, current_docs, current_answer)
             passed = self._check_passed(h_score, r_score)
 
             attempts.append(ReflectionAttempt(
                 attempt_number=retry + 2, hallucination_score=h_score,
                 relevance_score=r_score, passed=passed,
-                query_used=rewritten_query, action_taken="rewrite"
+                query_used=f"{query} (+{len(supplementary_queries)} supplementary)", action_taken="rewrite"
             ))
 
             if passed:
@@ -150,44 +152,60 @@ class SelfReflectionLoop:
             # 评估失败：保守判定为未通过（高幻觉、低相关）
             return 0.5, 0.5
 
-    async def _rewrite_query(self, original_query: str,
-                             conversation_history: Optional[list] = None) -> str:
-        """使用 QueryEnhancer 改写查询。
+    async def _build_supplementary_queries(self, original_query: str,
+                                           conversation_history: Optional[list] = None) -> List[str]:
+        """构建补充召回 query。
 
-        QueryEnhancer.enhance_query() 返回 Dict（含 original/hypothetical_doc/
-        sub_queries/expanded_queries），我们优先使用 hypothetical_doc（HyDE），
-        其次是第一个 expanded_query，最后回退到 original。
-        当 QueryEnhancer 不可用或调用失败时，graceful fallback 返回原 query。
+        HyDE / query expansion / decomposition 只用于扩大召回候选，不能替代 original_query。
         """
         if self.query_enhancer is None:
-            return original_query
+            return []
         try:
             enhanced = await self.query_enhancer.enhance_query(
                 original_query, conversation_history or []
             )
-            if not enhanced:
-                return original_query
-            # Dict 形态（当前 QueryEnhancer 实现）
-            if isinstance(enhanced, dict):
-                hyde = enhanced.get("hypothetical_doc")
-                if hyde and isinstance(hyde, str) and hyde.strip():
-                    return hyde.strip()
-                expanded = enhanced.get("expanded_queries") or []
-                if expanded and isinstance(expanded, list) and expanded[0]:
-                    return str(expanded[0])
-                return enhanced.get("original", original_query)
-            # 字符串形态（兼容备用接口）
-            if isinstance(enhanced, str):
-                return enhanced
-            return original_query
-        except Exception as e:
-            logger.error(f"Query rewriting failed: {e}")
-            return original_query
+            if not isinstance(enhanced, dict):
+                return []
 
-    async def _retrieve(self, query: str) -> List[str]:
+            candidates: List[str] = []
+            hyde = enhanced.get("hypothetical_doc")
+            if isinstance(hyde, str) and hyde.strip():
+                candidates.append(hyde.strip())
+
+            for key in ("expanded_queries", "sub_queries"):
+                values = enhanced.get(key) or []
+                if isinstance(values, list):
+                    candidates.extend(str(v).strip() for v in values if v and str(v).strip())
+
+            result: List[str] = []
+            seen = {original_query.strip().lower()}
+            for candidate in candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                result.append(candidate)
+            return result
+        except Exception as e:
+            logger.error(f"Building supplementary queries failed: {e}")
+            return []
+
+    async def _rewrite_query(self, original_query: str,
+                             conversation_history: Optional[list] = None) -> str:
+        """兼容旧接口：返回原 query，避免 HyDE 替代用户真实问题。"""
+        return original_query
+
+    async def _retrieve(self, query: str, supplementary_queries: Optional[List[str]] = None) -> List[str]:
         """重新检索。兼容 RetrievalResult(.content) 与 Document(.page_content)。"""
         try:
-            results = await self.retriever.retrieve(query)
+            supplementary_queries = supplementary_queries or []
+            if supplementary_queries and hasattr(self.retriever, "retrieve_multi_query"):
+                results = await self.retriever.retrieve_multi_query(
+                    original_query=query,
+                    supplementary_queries=supplementary_queries,
+                )
+            else:
+                results = await self.retriever.retrieve(query)
             if not results:
                 return []
             docs: List[str] = []
@@ -207,10 +225,10 @@ class SelfReflectionLoop:
             search = DuckDuckGoSearchResults(max_results=5)
             # 同步调用包装成异步
             results = await asyncio.to_thread(search.invoke, query)
-            return f"Based on web search results:\n{results}"
+            return f"根据网络搜索结果：\n{results}"
         except Exception as e:
             logger.error(f"Web search fallback failed: {e}")
-            return "I apologize, but I couldn't find a reliable answer. Please try rephrasing your question."
+            return "抱歉，我没有找到可靠答案。请换一种问法再试一次。"
 
     def _build_result(self, answer, passed, h_score, r_score,
                       attempts, web_search, start_time) -> ReflectionResult:

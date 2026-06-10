@@ -56,7 +56,7 @@ def lookup_policy(query: str) -> str:
     Use this before making any flight changes or performing other 'write' events."""
     faq_results = search_faq.invoke({"query": query, "limit": 2})
     if not faq_results:
-        return "Sorry, I couldn't find any relevant policy information. Please contact support for assistance."
+        return "抱歉，我没有找到相关政策信息。请联系人工客服获取帮助。"
     
     policy_info = "\n\n".join([f"Q: {entry['question']}\nA: {entry['answer']}" for entry in faq_results])
-    return f"Here's the relevant policy information:\n\n{policy_info}"
+    return f"以下是相关政策信息：\n\n{policy_info}"

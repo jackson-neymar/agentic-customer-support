@@ -12,12 +12,6 @@ from customer_support_chat.app.core.metrics import (
     guardrail_check_duration,
 )
 
-# GoHumanLoop imports (moved to humanloop_manager.py to avoid circular imports)
-# from gohumanloop.core.manager import DefaultHumanLoopManager
-# from gohumanloop.adapters.langgraph_adapter import HumanloopAdapter
-# from gohumanloop.providers.terminal_provider import TerminalProvider
-# from customer_support_chat.app.core.humanloop_manager import humanloop_adapter
-
 from customer_support_chat.app.core.state import State
 from customer_support_chat.app.core.logger import logger
 from customer_support_chat.app.services.utils import (
@@ -93,13 +87,6 @@ from customer_support_chat.app.services.assistants.excursion_assistant import (
   book_excursion_safe_tools,
   book_excursion_sensitive_tools,
 )
-
-# Initialize HumanLoopManager and HumanloopAdapter for GoHumanLoop
-# humanloop_manager = DefaultHumanLoopManager(
-#     initial_providers=TerminalProvider(name="TerminalProvider")
-# )
-# humanloop_adapter = HumanloopAdapter(humanloop_manager, default_timeout=60)
-# Moved to humanloop_manager.py to avoid circular imports
 
 # Initialize the graph
 builder = StateGraph(State)
@@ -193,7 +180,7 @@ def guardrail_check(state: State, config: RunnableConfig):
     logger.info(f"🛡️ Checking safety and relevance for user input: '{user_input}'")
 
     # 1. Check for Jailbreak attempts
-    jailbreak_prompt = f"{jailbreak_guardrail_agent_instructions}\n\nUser Input: {user_input}"
+    jailbreak_prompt = f"{jailbreak_guardrail_agent_instructions}\n\n用户输入：{user_input}"
     try:
         jailbreak_result = jailbreak_guardrail_agent.invoke(jailbreak_prompt)
     except Exception as e:
@@ -219,7 +206,7 @@ def guardrail_check(state: State, config: RunnableConfig):
         }
 
     # 2. Check for Relevance
-    relevance_prompt = f"{relevance_guardrail_agent_instructions}\n\nUser Input: {user_input}"
+    relevance_prompt = f"{relevance_guardrail_agent_instructions}\n\n用户输入：{user_input}"
     try:
         relevance_result = relevance_guardrail_agent.invoke(relevance_prompt)
     except Exception as e:

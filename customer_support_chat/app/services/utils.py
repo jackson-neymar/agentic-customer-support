@@ -27,11 +27,11 @@ def create_entry_node(assistant_name: str, new_dialog_state: str) -> Callable:
                 tool_messages.append(
                     ToolMessage(
                         content=(
-                            f"The assistant is now the {assistant_name}. Reflect on the above conversation between the host assistant and the user. "
-                            f"The user's intent is unsatisfied. Use the provided tools to assist the user. Remember, you are {assistant_name}, "
-                            "and the booking, update, or other action is not complete until after you have successfully invoked the appropriate tool. "
-                            "If the user changes their mind or needs help for other tasks, call the CompleteOrEscalate function to let the primary host assistant take control. "
-                            "Do not mention who you are—just act as the proxy for the assistant."
+                            f"当前助手已切换为 {assistant_name}。请回顾上方主助手与用户之间的对话。"
+                            f"用户意图尚未被满足。请使用提供的工具帮助用户。请记住，你现在是 {assistant_name}，"
+                            "预订、修改或其他操作只有在成功调用适当工具后才算完成。"
+                            "如果用户改变主意或需要处理其他任务，请调用 CompleteOrEscalate 函数，让主助手重新接管。"
+                            "不要提及你的身份——只需作为该助手的代理执行任务。"
                         ),
                         tool_call_id=tool_call["id"],
                     )

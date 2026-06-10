@@ -1,7 +1,7 @@
 from vectorizer.app.vectordb.vectordb import VectorDB
 from customer_support_chat.app.core.settings import get_settings
+from customer_support_chat.app.core.humanloop_manager import humanloop_adapter
 from langchain_core.tools import tool
-# from customer_support_chat.app.core.humanloop_manager import humanloop_adapter # Import the adapter
 import sqlite3
 from typing import Optional, List, Dict
 
@@ -33,7 +33,7 @@ def search_trip_recommendations(
     return recommendations
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def book_excursion(recommendation_id: int, approval_result=None) -> str:
     """Book an excursion by its ID."""
     # If approval is rejected, this function body won't execute.
@@ -55,7 +55,7 @@ async def book_excursion(recommendation_id: int, approval_result=None) -> str:
         return f"No excursion found with ID {recommendation_id}."
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def update_excursion(recommendation_id: int, details: str, approval_result=None) -> str:
     """Update an excursion's details by its ID."""
     # If approval is rejected, this function body won't execute.
@@ -78,7 +78,7 @@ async def update_excursion(recommendation_id: int, details: str, approval_result
         return f"No excursion found with ID {recommendation_id}."
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def cancel_excursion(recommendation_id: int, approval_result=None) -> str:
     """Cancel an excursion by its ID."""
     # If approval is rejected, this function body won't execute.

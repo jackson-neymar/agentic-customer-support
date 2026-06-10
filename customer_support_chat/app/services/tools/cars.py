@@ -1,5 +1,6 @@
 from vectorizer.app.vectordb.vectordb import VectorDB
 from customer_support_chat.app.core.settings import get_settings
+from customer_support_chat.app.core.humanloop_manager import humanloop_adapter
 from customer_support_chat.app.services.gds import get_gds_adapter
 from langchain_core.tools import tool
 
@@ -40,7 +41,7 @@ def search_car_rentals(
     return rentals
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def book_car_rental(rental_id: int, approval_result=None) -> str:
     """Book a car rental by its ID."""
     # If approval is rejected, this function body won't execute.
@@ -61,7 +62,7 @@ async def book_car_rental(rental_id: int, approval_result=None) -> str:
         return f"Failed to book car rental {rental_id}: {exc}"
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def update_car_rental(
     rental_id: int,
     start_date: Optional[Union[datetime, date]] = None,
@@ -71,7 +72,7 @@ async def update_car_rental(
     """Update a car rental's start and end dates by its ID."""
     # If approval is rejected, this function body won't execute.
     # If approval is granted, approval_result will contain the approval details.
-    
+
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
 
@@ -96,42 +97,7 @@ async def update_car_rental(
         return f"No car rental found with ID {rental_id}."
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
-def update_car_rental(
-    rental_id: int,
-    start_date: Optional[Union[datetime, date]] = None,
-    end_date: Optional[Union[datetime, date]] = None,
-    approval_result=None
-) -> str:
-    """Update a car rental's start and end dates by its ID."""
-    # If approval is rejected, this function body won't execute.
-    # If approval is granted, approval_result will contain the approval details.
-    
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-
-    if start_date:
-        cursor.execute(
-            "UPDATE car_rentals SET start_date = ? WHERE id = ?",
-            (start_date.strftime('%Y-%m-%d'), rental_id),
-        )
-    if end_date:
-        cursor.execute(
-            "UPDATE car_rentals SET end_date = ? WHERE id = ?",
-            (end_date.strftime('%Y-%m-%d'), rental_id),
-        )
-
-    conn.commit()
-
-    if cursor.rowcount > 0:
-        conn.close()
-        return f"Car rental {rental_id} successfully updated."
-    else:
-        conn.close()
-        return f"No car rental found with ID {rental_id}."
-
-@tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def cancel_car_rental(rental_id: int, approval_result=None) -> str:
     """Cancel a car rental by its ID."""
     # If approval is rejected, this function body won't execute.

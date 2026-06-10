@@ -161,26 +161,6 @@ async def process_user_message(session_data: Dict[str, Any], user_message: str) 
                         }
                     })
                     
-                    # Create tool message responses to acknowledge the tool calls
-                    # This is necessary to prevent the error about missing tool call responses
-                    tool_messages = []
-                    for tool_call in last_message.tool_calls:
-                        tool_messages.append(
-                            ToolMessage(
-                                tool_call_id=tool_call["id"],
-                                content="Action requires user approval. Please wait for user decision.",
-                            )
-                        )
-                    
-                    logger.info(f"Sending {len(tool_messages)} acknowledgment messages for HITL")
-                    
-                    # Send the tool messages to acknowledge the tool calls
-                    # This will prevent the error about missing tool call responses
-                    multi_agentic_graph.update_state(
-                        langgraph_config,
-                        {"messages": tool_messages},
-                    )
-                    
                     # Return a message indicating user approval is needed
                     if latest_ai_response:
                         latest_ai_response += "\n\n[User approval required for sensitive action. Please approve or reject this action in the web interface.]"
@@ -361,11 +341,11 @@ async def process_user_decision(session_data: Dict[str, Any], decision: str) -> 
     
     # Extract the config from session_data
     config = session_data.get("config", {})
-    # Ensure it's in the correct format for LangGraph
-    langgraph_config = {"configurable": config}
-    
-    # Variable to track printed message IDs to avoid duplicates
-    printed_message_ids = set()
+    if "configurable" in config:
+        langgraph_config = config
+    else:
+        langgraph_config = {"configurable": config}
+
     result_message = ""
     
     try:
@@ -383,100 +363,58 @@ async def process_user_decision(session_data: Dict[str, Any], decision: str) -> 
         
         # Get the tool calls from the pending action
         tool_calls = pending_action.get("tool_calls", [])
-        
+
         if decision.lower() == "approve":
-            # For approval, we directly execute the tools
-            # This is a simplified approach - in a real implementation, you would
-            # execute the actual tools and return their results
-            for tool_call in tool_calls:
-                tool_name = tool_call["name"]
-                tool_args = tool_call["args"]
-                
-                # Import and execute the appropriate tools
-                try:
-                    if tool_name == "update_hotel":
-                        from customer_support_chat.app.services.tools.hotels import update_hotel
-                        # Use ainvoke for async functions
-                        result = await update_hotel.ainvoke(tool_args)
-                        result_message = f"Hotel updated successfully: {result}"
-                    elif tool_name == "book_hotel":
-                        from customer_support_chat.app.services.tools.hotels import book_hotel
-                        # Use ainvoke for async functions
-                        result = await book_hotel.ainvoke(tool_args)
-                        result_message = f"Hotel booked successfully: {result}"
-                    elif tool_name == "cancel_hotel":
-                        from customer_support_chat.app.services.tools.hotels import cancel_hotel
-                        # Use ainvoke for async functions
-                        result = await cancel_hotel.ainvoke(tool_args)
-                        result_message = f"Hotel cancelled successfully: {result}"
-                    elif tool_name == "update_car_rental":
-                        from customer_support_chat.app.services.tools.cars import update_car_rental
-                        # Use ainvoke for async functions
-                        result = await update_car_rental.ainvoke(tool_args)
-                        result_message = f"Car rental updated successfully: {result}"
-                    elif tool_name == "book_car_rental":
-                        from customer_support_chat.app.services.tools.cars import book_car_rental
-                        # Use ainvoke for async functions
-                        result = await book_car_rental.ainvoke(tool_args)
-                        result_message = f"Car rental booked successfully: {result}"
-                    elif tool_name == "cancel_car_rental":
-                        from customer_support_chat.app.services.tools.cars import cancel_car_rental
-                        # Use ainvoke for async functions
-                        result = await cancel_car_rental.ainvoke(tool_args)
-                        result_message = f"Car rental cancelled successfully: {result}"
-                    elif tool_name == "book_excursion":
-                        from customer_support_chat.app.services.tools.excursions import book_excursion
-                        # Use ainvoke for async functions
-                        result = await book_excursion.ainvoke(tool_args)
-                        result_message = f"Excursion booked successfully: {result}"
-                    elif tool_name == "update_excursion":
-                        from customer_support_chat.app.services.tools.excursions import update_excursion
-                        # Use ainvoke for async functions
-                        result = await update_excursion.ainvoke(tool_args)
-                        result_message = f"Excursion updated successfully: {result}"
-                    elif tool_name == "cancel_excursion":
-                        from customer_support_chat.app.services.tools.excursions import cancel_excursion
-                        # Use ainvoke for async functions
-                        result = await cancel_excursion.ainvoke(tool_args)
-                        result_message = f"Excursion cancelled successfully: {result}"
-                    elif tool_name == "update_ticket_to_new_flight":
-                        from customer_support_chat.app.services.tools.flights import update_ticket_to_new_flight
-                        # Use ainvoke for async functions
-                        result = await update_ticket_to_new_flight.ainvoke({**tool_args, "config": langgraph_config})
-                        result_message = f"Flight updated successfully: {result}"
-                    elif tool_name == "cancel_ticket":
-                        from customer_support_chat.app.services.tools.flights import cancel_ticket
-                        # Use ainvoke for async functions
-                        result = await cancel_ticket.ainvoke({**tool_args, "config": langgraph_config})
-                        result_message = f"Flight cancelled successfully: {result}"
-                    else:
-                        result_message = f"Tool {tool_name} executed successfully (tool not implemented in approval handler)"
-                    
-                    # Add tool execution result to operation log
-                    add_operation_log(session_data["session_id"], {
-                        "type": "tool_result",
-                        "title": f"{tool_name} Result",
-                        "content": result if 'result' in locals() else result_message
-                    })
-                    
-                except Exception as e:
-                    error_msg = f"Error executing {tool_name}: {str(e)}"
-                    result_message = error_msg
-                    add_operation_log(session_data["session_id"], {
-                        "type": "error",
-                        "title": f"{tool_name} Execution Error",
-                        "content": error_msg
-                    })
+            logger.info("User approved HITL action; resuming LangGraph from interrupt")
+            result = await multi_agentic_graph.ainvoke(None, langgraph_config)
+            messages = result.get("messages", []) if result else []
+            for message in messages:
+                if isinstance(message, AIMessage) and message.content and message.content.strip():
+                    result_message = message.content
+                elif isinstance(message, ToolMessage):
+                    result_message = str(message.content)
+
+            add_operation_log(session_data["session_id"], {
+                "type": "system_message",
+                "title": "Action Approved",
+                "content": "User approved the sensitive action; LangGraph resumed execution.",
+                "details": {"tool_calls": tool_calls}
+            })
         else:  # reject
-            # For rejection, we simply inform the user
-            result_message = "Operation cancelled by user."
-            # Add cancellation to operation log
+            logger.info("User rejected HITL action; returning denial ToolMessage to LangGraph")
+            rejection_messages = [
+                ToolMessage(
+                    tool_call_id=tool_call["id"],
+                    content=(
+                        "API call denied by user. "
+                        "Reasoning: 'User rejected the sensitive action in the web interface.'. "
+                        "Continue assisting, accounting for the user's input."
+                    ),
+                )
+                for tool_call in tool_calls
+            ]
+
+            result = await multi_agentic_graph.ainvoke(
+                {"messages": rejection_messages},
+                langgraph_config,
+            )
+            messages = result.get("messages", []) if result else []
+            for message in messages:
+                if isinstance(message, AIMessage) and message.content and message.content.strip():
+                    result_message = message.content
+                elif isinstance(message, ToolMessage):
+                    result_message = str(message.content)
+
+            if not result_message:
+                result_message = "Operation cancelled by user."
+
             add_operation_log(session_data["session_id"], {
                 "type": "system_message",
                 "title": "Action Cancelled",
-                "content": "User rejected the sensitive action"
+                "content": "User rejected the sensitive action",
+                "details": {"tool_calls": tool_calls}
             })
-        
+
         # Clear the pending action and user decision
         clear_pending_action(session_data["session_id"])
         clear_user_decision(session_data["session_id"])
