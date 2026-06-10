@@ -1,9 +1,9 @@
 from vectorizer.app.vectordb.vectordb import VectorDB
 from customer_support_chat.app.core.settings import get_settings
+from customer_support_chat.app.core.humanloop_manager import humanloop_adapter
 from customer_support_chat.app.services.gds import get_gds_adapter
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
-# from customer_support_chat.app.core.humanloop_manager import humanloop_adapter # Import the adapter
 import logging
 import sqlite3
 from typing import Optional, Union, List, Dict
@@ -79,7 +79,7 @@ def search_flights(
     return flights
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def update_ticket_to_new_flight(
     ticket_no: str, new_flight_id: int, *, config: RunnableConfig, approval_result=None
 ) -> str:
@@ -108,7 +108,7 @@ async def update_ticket_to_new_flight(
         return f"Failed to update ticket {ticket_no}: {exc}"
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def cancel_ticket(ticket_no: str, *, config: RunnableConfig, approval_result=None) -> str:
     """Cancel the user's ticket and remove it from the database."""
     # If approval is rejected, this function body won't execute.

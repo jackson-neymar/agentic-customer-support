@@ -31,7 +31,7 @@ class Assistant:
                 or isinstance(result.content, list)
                 and not result.content[0].get("text")
             ):
-                messages = state["messages"] + [("user", "Respond with a real output.")]
+                messages = state["messages"] + [("user", "请给出实际回答，不要返回空内容。")]
                 state = {**state, "messages": messages}
             else:
                 break

@@ -195,26 +195,26 @@ class RAGService:
     ) -> dict:
         """带 Query Rewriting 的检索便捷接口。
 
-        直接使用 QueryEnhancer 增强用户原始 query 后再检索，
-        不进入完整的 Self-Reflection Loop。适合外部模块希望显式获得
-        "改写后的 query + 检索结果" 时调用。
+        安全版 HyDE 策略：原始 query 始终保留，HyDE / query expansion / sub queries
+        只作为补充召回信号，不替代用户原始问题。最终重排序仍锚定 original query。
 
-        优先级：hypothetical_doc (HyDE) > expanded_queries[0] > 原 query。
         当 QueryEnhancer 创建/调用失败时，graceful fallback 回原 query。
 
         Returns:
             {
-                "query": <实际使用的 query 字符串>,
+                "query": <用户原始 query>,
                 "original_query": <用户原始 query>,
-                "results": <retriever.retrieve 返回的结果列表>,
+                "supplementary_queries": <用于补充召回的 query 列表>,
+                "retrieval_queries": <实际参与召回的 query 列表>,
+                "results": <retriever 返回的结果列表>,
                 "enhanced": <QueryEnhancer 返回的完整 Dict 或 None>,
             }
         """
         if self.retriever is None:
             raise RuntimeError("RAG 系统未初始化，请先调用 initialize()")
 
-        rewritten_query = query
         enhanced_payload = None
+        supplementary_queries: List[str] = []
 
         # 懒加载 QueryEnhancer（与 _get_reflection_loop 共享同一实例）
         if self._query_enhancer is None:
@@ -235,36 +235,69 @@ class RAGService:
                 enhanced_payload = await self._query_enhancer.enhance_query(
                     query, conversation_history or []
                 )
-                if isinstance(enhanced_payload, dict):
-                    hyde = enhanced_payload.get("hypothetical_doc")
-                    if hyde and isinstance(hyde, str) and hyde.strip():
-                        rewritten_query = hyde.strip()
-                    else:
-                        expanded = enhanced_payload.get("expanded_queries") or []
-                        if expanded and isinstance(expanded, list) and expanded[0]:
-                            rewritten_query = str(expanded[0])
+                supplementary_queries = self._extract_supplementary_queries(query, enhanced_payload)
             except Exception as e:
                 logger.error(f"retrieve_with_rewrite: enhance_query failed: {e}")
-                rewritten_query = query
+                supplementary_queries = []
 
         try:
-            results = await self.retriever.retrieve(
-                query=rewritten_query,
-                sources=sources,
-                method=method,
-                top_k=top_k,
-                **kwargs,
-            )
+            if supplementary_queries and hasattr(self.retriever, "retrieve_multi_query"):
+                results = await self.retriever.retrieve_multi_query(
+                    original_query=query,
+                    supplementary_queries=supplementary_queries,
+                    sources=sources,
+                    method=method,
+                    top_k=top_k,
+                    **kwargs,
+                )
+            else:
+                results = await self.retriever.retrieve(
+                    query=query,
+                    sources=sources,
+                    method=method,
+                    top_k=top_k,
+                    **kwargs,
+                )
         except Exception as e:
             logger.error(f"retrieve_with_rewrite: retrieval failed: {e}")
             results = []
 
         return {
-            "query": rewritten_query,
+            "query": query,
             "original_query": query,
+            "supplementary_queries": supplementary_queries,
+            "retrieval_queries": [query, *supplementary_queries],
             "results": results,
             "enhanced": enhanced_payload,
         }
+
+    def _extract_supplementary_queries(self, original_query: str, enhanced_payload) -> List[str]:
+        """从 QueryEnhancer 输出中提取补充召回 query，保留原始 query 作为唯一事实锚点。"""
+        if not isinstance(enhanced_payload, dict):
+            return []
+
+        candidates: List[str] = []
+
+        hyde = enhanced_payload.get("hypothetical_doc")
+        if isinstance(hyde, str) and hyde.strip():
+            candidates.append(hyde.strip())
+
+        for key in ("expanded_queries", "sub_queries"):
+            values = enhanced_payload.get(key) or []
+            if isinstance(values, list):
+                candidates.extend(str(v).strip() for v in values if v and str(v).strip())
+
+        # 去重并过滤与原 query 完全相同的项
+        result: List[str] = []
+        seen = {original_query.strip().lower()}
+        for candidate in candidates:
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(candidate)
+
+        return result
 
     async def search_and_reflect(
         self,

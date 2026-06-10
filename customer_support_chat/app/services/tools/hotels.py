@@ -1,8 +1,8 @@
 from vectorizer.app.vectordb.vectordb import VectorDB
 from customer_support_chat.app.core.settings import get_settings
+from customer_support_chat.app.core.humanloop_manager import humanloop_adapter
 from customer_support_chat.app.services.gds import get_gds_adapter
 from langchain_core.tools import tool
-# from customer_support_chat.app.core.humanloop_manager import humanloop_adapter # Import the adapter
 import logging
 import sqlite3
 from typing import Optional, Union, List, Dict
@@ -39,7 +39,7 @@ def search_hotels(
     return hotels
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def book_hotel(hotel_id: int, approval_result=None) -> str:
     """Book a hotel by its ID."""
     # If approval is rejected, this function body won't execute.
@@ -63,8 +63,8 @@ import sqlite3
 from datetime import datetime, date
 from typing import Optional, Union
 
-# @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@tool
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def update_hotel(
     hotel_id: int,
     checkin_date: Optional[Union[datetime, date]] = None,
@@ -115,7 +115,7 @@ async def update_hotel(
     return f"Hotel {hotel_id} successfully updated and booked."
 
 @tool
-# @humanloop_adapter.require_approval(execute_on_reject=False)
+@humanloop_adapter.require_approval(execute_on_reject=False)
 async def cancel_hotel(hotel_id: int, approval_result=None) -> str:
     """Cancel a hotel by its ID."""
     # If approval is rejected, this function body won't execute.

@@ -321,18 +321,6 @@ async def _stream_chat_events(session_data: dict, user_message: str):
                 except Exception as he:
                     logger.warning(f"HITL persistence skipped: {he}")
 
-                # 给所有未响应的 tool_call 发占位 ToolMessage，避免后续状态错误
-                try:
-                    tool_messages = [
-                        ToolMessage(
-                            tool_call_id=tc["id"],
-                            content="Action requires user approval. Please wait for user decision."
-                        ) for tc in last_message.tool_calls
-                    ]
-                    multi_agentic_graph.update_state(langgraph_config, {"messages": tool_messages})
-                except Exception as upd_err:
-                    logger.warning(f"Failed to acknowledge HITL tool calls: {upd_err}")
-
                 metrics_collector.record_approval('pending')
 
                 # 推送 pending_action 事件
