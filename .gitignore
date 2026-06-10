@@ -39,3 +39,6 @@ build/
 *.egg-info/
 
 interview_agentic_rag_observability_security.md
+knowledge_base/
+faq_documents/
+debug_log/
